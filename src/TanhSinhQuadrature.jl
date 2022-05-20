@@ -2,7 +2,7 @@ module TanhSinhQuadrature
 
 using LinearAlgebra: norm
 
-export Quadrature, quadts
+export TSQuadrature, quadts
 
 # ∫dx f(x) = ∫dt f(t) dx/dt
 #
@@ -25,7 +25,7 @@ struct Level{T}
 end
 
 # A complete quadrature scheme. `h` is the base step size for level 0.
-struct Quadrature{T}
+struct TSQuadrature{T}
     h::T
     levels::Vector{Level{T}}
 end
@@ -62,34 +62,35 @@ function Level(h::T) where {T<:Real}
     return Level{T}(points)
 end
 
-function Quadrature{T}(nlevels::Int=20) where {T<:Real}
+function TSQuadrature{T}(nlevels::Int=20) where {T<:Real}
     h = find_h(T)
     levels = Level{T}[]
     for level in 1:nlevels
         push!(levels, Level(h / 2^level))
     end
-    return Quadrature{T}(h, levels)
+    return TSQuadrature{T}(h, levels)
 end
 
-function quadts(f, xmin::T, xmax::T, quad::Quadrature{T}; atol::T=zero(T),
+function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
                 rtol::T=atol > 0 ? zero(T) : sqrt(eps(T))) where {T<:Real}
-    h = quad.h
+    Δx = (xmax - xmin) / 2
+    h = quad.h * Δx
 
     x = (xmin + xmax) / 2
-    w = weight(x)
+    w = weight(zero(T))
     s = h * w * f(x)
     levels = 0
-    error = T(Inf)
+    error = norm(T(Inf))
 
     for level in quad.levels
         h /= 2
         levels += 1
         sold = s
 
-        s = zero(T)
+        s = zero(sold)
         for p in level.points
-            xm = xmin + (xmax - xmin) / 2 * (1 - p.x)
-            xp = xmax - (xmax - xmin) / 2 * (1 - p.x)
+            xm = xmin + Δx * (1 - p.x)
+            xp = xmax - Δx * (1 - p.x)
             w = p.w
             s += w * (f(xm) + f(xp))
         end
@@ -101,6 +102,11 @@ function quadts(f, xmin::T, xmax::T, quad::Quadrature{T}; atol::T=zero(T),
     end
 
     return (result=s, error=error, levels=levels)
+end
+
+function quadts(f, quad::TSQuadrature{T}, xmin::Real, xmax::Real; atol::Real=zero(T),
+                rtol::Real=atol > 0 ? zero(T) : sqrt(eps(T))) where {T<:Real}
+    return quadts(f, quad, T(xmin), T(xmax); atol=T(atol), rtol=T(rtol))
 end
 
 # function quadts(f, xmin::NTuple{D,T}, xmax::NTuple{D,T}; h::NTuple{D,T},
