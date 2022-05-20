@@ -1,0 +1,8 @@
+name = "TanhSinhQuadrature"
+uuid = "56eaf279-2fb8-4cc8-9a20-8bc197332b10"
+authors = ["Erik Schnetter <schnetter@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
