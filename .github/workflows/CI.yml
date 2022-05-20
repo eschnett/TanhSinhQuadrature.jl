@@ -28,6 +28,9 @@ jobs:
             version: "nightly"
           - arch: "x64"
             os: "ubuntu-latest"
+            version: "1.8"
+          - arch: "x64"
+            os: "ubuntu-latest"
             version: "1.6"
           - arch: "x64"
             os: "ubuntu-latest"
@@ -90,8 +93,8 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Documenter: doctest
-            using SimplexPoly
-            doctest(SimplexPoly)'
+            using TanhSinhQuadrature
+            doctest(TanhSinhQuadrature)'
         env:
           PYTHON:
       - run: julia --project=docs docs/make.jl
