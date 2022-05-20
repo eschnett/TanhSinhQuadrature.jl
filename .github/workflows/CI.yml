@@ -44,12 +44,13 @@ jobs:
           - arch: "x64"
             os: "ubuntu-latest"
             version: "1.2"
-          - arch: "x64"
-            os: "ubuntu-latest"
-            version: "1.1"
-          - arch: "x64"
-            os: "ubuntu-latest"
-            version: "1.0"
+          # We cannot run the test suite because `DoubleFloats` is not available
+          # - arch: "x64"
+          #   os: "ubuntu-latest"
+          #   version: "1.1"
+          # - arch: "x64"
+          #   os: "ubuntu-latest"
+          #   version: "1.0"
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
