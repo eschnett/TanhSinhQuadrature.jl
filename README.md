@@ -10,7 +10,8 @@ Julia
   code repository
 * [![GitHub
   CI](https://github.com/eschnett/TanhSinhQuadrature.jl/workflows/CI/badge.svg)](https://github.com/eschnett/TanhSinhQuadrature.jl/actions)
-* [![codecov](https://codecov.io/gh/eschnett/TanhSinhQuadrature.jl/branch/main/graph/badge.svg?token=QSDV4LBJWO)](https://codecov.io/gh/eschnett/TanhSinhQuadrature.jl)
+* [![codecov](https://codecov.io/gh/eschnett/TanhSinhQuadrature.jl/branch/main/graph/badge.svg?token=vHtLZhZpKG)](https://codecov.io/gh/eschnett/TanhSinhQuadrature.jl)
+
 
 ## Related work
 
