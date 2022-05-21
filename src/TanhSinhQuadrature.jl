@@ -39,8 +39,10 @@ function find_h(T::Type)
     i = 1
     while true
         t = T(i)
+        x = ordinate(t)
         w = weight(t)
-        w < eps(T) && break
+        abs(x) == 1 && break
+        w == 0 && break
         i += 1
     end
     return T(max(1, i - 1))
