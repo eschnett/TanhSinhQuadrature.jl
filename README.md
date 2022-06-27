@@ -12,6 +12,7 @@ Julia
   CI](https://github.com/eschnett/TanhSinhQuadrature.jl/workflows/CI/badge.svg)](https://github.com/eschnett/TanhSinhQuadrature.jl/actions)
 * [![codecov](https://codecov.io/gh/eschnett/TanhSinhQuadrature.jl/branch/main/graph/badge.svg?token=vHtLZhZpKG)](https://codecov.io/gh/eschnett/TanhSinhQuadrature.jl)
 
+THIS PACKAGE IS INCOMPLETE. DO NOT USE.
 
 ## Related work
 

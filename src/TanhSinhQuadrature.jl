@@ -1,6 +1,9 @@
 module TanhSinhQuadrature
 
 using LinearAlgebra: norm
+using StaticArrays
+
+################################################################################
 
 export TSQuadrature, quadts
 
@@ -67,8 +70,11 @@ end
 function TSQuadrature{T}(nlevels::Int=20) where {T<:Real}
     h = find_h(T)
     levels = Level{T}[]
+    # println("TSQuadrature{$T}:")
     for level in 1:nlevels
         push!(levels, Level(h / 2^level))
+        npoints = length(levels[end].points)
+        # println("    level: $level    npoints: $npoints")
     end
     return TSQuadrature{T}(h, levels)
 end
@@ -82,7 +88,7 @@ function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
     w = weight(zero(T))
     s = h * w * f(x)
     levels = 0
-    error = norm(T(Inf))
+    error = norm(typeof(s)(Inf))
 
     for level in quad.levels
         h /= 2
@@ -111,24 +117,102 @@ function quadts(f, quad::TSQuadrature{T}, xmin::Real, xmax::Real; atol::Real=zer
     return quadts(f, quad, T(xmin), T(xmax); atol=T(atol), rtol=T(rtol))
 end
 
-# function quadts(f, xmin::NTuple{D,T}, xmax::NTuple{D,T}; h::NTuple{D,T},
-#                 kmax::CartesianIndex{D}) where {D,T<:Real}
-#     s = zero(T)
-#     for k in (-kmax):kmax
-#         x = ntuple(d -> tanh(T(π) / 2 * sinh(h[d] * Tuple(k)[d])), D)
-#         w = prod(ntuple(d -> T(π) / 2 * h[d] * cosh(h[d] * Tuple(k)[d]) / cosh(T(π) / 2 * sinh(h[d] * Tuple(k)[d]))^2, D))
-#         s += w * f(x...)
-#     end
-#     return s
-# end
-# 
-# function quadts(f, xmin::NTuple{D,T}, xmax::NTuple{D,T}; h::T, kmax::Int) where {D,T<:Real}
-#     return quadts(f, xmin, xmax; h=ntuple(d -> h, D),
-#                   kmax=CartesianIndex(ntuple(d -> kmax, D)))
-# end
+################################################################################
 
-# function quadts(f, xmin::NTuple{D,T}, xmax::NTuple{D,T}; levels::Integer=4) where {D,T<:Real}
-#     return quadts(f, xmin, xmax; levels=Int(levels))
-# end
+export TSQuadratureND
+
+# An integration point, defined by its coordinate `x` and weight `w`
+struct PointND{D,T}
+    x::SVector{D,T}
+    w::T
+end
+
+# We integrate in levels. Each successivel level refines the previous
+# one, and only contains the additional points and weights.
+struct LevelND{D,T}
+    points::Vector{PointND{D,T}}
+end
+
+# A complete quadrature scheme. `h` is the base step size for level 0.
+struct TSQuadratureND{D,T}
+    h::T
+    levels::Vector{LevelND{D,T}}
+end
+
+function LevelND{D,T}(level::Level{T}) where {D,T<:Real}
+    D::Int
+    @assert D ≥ 0
+    points = PointND{D,T}[]
+    npoints = length(level.points)
+    for i in CartesianIndex(ntuple(d -> 1, D)):CartesianIndex(ntuple(d -> npoints, D))
+        x = SVector{D,T}(level.points[Tuple(i)[d]].x for d in 1:D)
+        w = prod(level.points[Tuple(i)[d]].w for d in 1:D)
+        w ≠ 0 && push!(points, PointND{D,T}(x, w))
+    end
+    return LevelND{D,T}(points)
+end
+
+function TSQuadratureND{D,T}(quad::TSQuadrature{T}) where {D,T<:Real}
+    D::Int
+    @assert D ≥ 0
+    h = quad.h
+    nlevels = length(quad.levels)
+    levels = LevelND{D,T}[]
+    # println("TSQuadratureND{$D,$T}:")
+    for level in 1:nlevels
+        push!(levels, LevelND{D,T}(quad.levels[level]))
+        npoints = length(levels[end].points)
+        # println("    level: $level    npoints: $npoints")
+    end
+    return TSQuadratureND{D,T}(h, levels)
+end
+
+TSQuadratureND{D,T}(nlevels::Int) where {D,T<:Real} = TSQuadratureND{D,T}(TSQuadrature{T}(nlevels))
+
+function quadts(f, quad::TSQuadratureND{D,T}, xmin::SVector{D,T}, xmax::SVector{D,T}; atol::T=zero(T),
+                rtol::T=atol > 0 ? zero(T) : sqrt(eps(T))) where {D,T<:Real}
+    D::Int
+    @assert D ≥ 0
+
+    Δx = (xmax - xmin) / 2
+    h = quad.h^D * prod(Δx)
+
+    x = (xmin + xmax) / 2
+    w = weight(zero(T))^D
+    s = h * w * f(x...)
+    levels = 0
+    error = norm(typeof(s)(Inf))
+
+    for level in quad.levels
+        h /= 2^D
+        levels += 1
+        sold = s
+
+        s = zero(sold)
+        for p in level.points
+            t = zero(s)
+            for i in CartesianIndex(ntuple(d -> -1, D)):CartesianIndex(ntuple(d -> 2, D)):CartesianIndex(ntuple(d -> +1, D))
+                xm = xmin + Δx .* (1 .- p.x)
+                xp = xmax - Δx .* (1 .- p.x)
+                x = SVector{D,T}(Tuple(i)[d] < 0 ? xm[d] : xp[d] for d in 1:D)
+                t += f(x...)
+            end
+            w = p.w
+            s += w * t
+        end
+        s = h * s + sold / 2
+
+        tol = max(norm(s) * rtol, atol)
+        error = norm(s - sold)
+        levels ≥ 4 && error ≤ tol && break
+    end
+
+    return (result=s, error=error, levels=levels)
+end
+
+function quadts(f, quad::TSQuadratureND{D,T}, xmin::Union{NTuple{D},SVector{D}}, xmax::Union{NTuple{D},SVector{D}};
+                atol::Real=zero(T), rtol::Real=atol > 0 ? zero(T) : sqrt(eps(T))) where {D,T<:Real}
+    return quadts(f, quad, SVector{D,T}(xmin), SVector{D,T}(xmax); atol=atol, rtol=rtol)
+end
 
 end

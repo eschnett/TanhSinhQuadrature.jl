@@ -1,15 +1,22 @@
 using DoubleFloats
 using Random
+using StaticArrays
 using TanhSinhQuadrature
 using Test
 
+################################################################################
+
+const Types = [Float32, Float64, Double64, BigFloat]
+
+################################################################################
+
 const quads = Dict()
 
-@testset "Create quadrature rules T=$T" for T in [Float32, Float64, Double64, BigFloat]
+@testset "Create quadrature rules T=$T" for T in Types
     quads[T] = TSQuadrature{T}()
 end
 
-@testset "Basic integration T=$T" for T in [Float32, Float64, Double64, BigFloat]
+@testset "Basic integration T=$T" for T in Types
     quad = quads[T]::TSQuadrature{T}
 
     f0(x) = 1
@@ -22,7 +29,7 @@ end
 end
 
 Random.seed!(0)
-@testset "Integral bounds T=$T" for T in [Float32, Float64, Double64, BigFloat]
+@testset "Integral bounds T=$T" for T in Types
     quad = quads[T]::TSQuadrature{T}
 
     f0(x) = 1
@@ -38,7 +45,7 @@ Random.seed!(0)
 end
 
 Random.seed!(0)
-@testset "Linearity T=$T" for T in [Float32, Float64, Double64, BigFloat]
+@testset "Linearity T=$T" for T in Types
     quad = quads[T]::TSQuadrature{T}
 
     a = 1 + T(rand(-5:5)) / 10
@@ -68,7 +75,7 @@ Random.seed!(0)
 end
 
 Random.seed!(0)
-@testset "Integrals of singular functions T=$T" for T in [Float32, Float64, Double64, BigFloat]
+@testset "Integrals of singular functions T=$T" for T in Types
     quad = quads[T]::TSQuadrature{T}
 
     rtol = Dict(Float32 => 10 * sqrt(eps(T)),
