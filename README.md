@@ -28,7 +28,7 @@ julia> quadts(f, TSQuadrature{Float64}(), -1,1, atol=1e-16)
 ```
 
 Also the transformation now supports higher order of odd powers of the form 
-$$\Psi(t) = Tanh(\frac{\Pi}{2} Sinh(t^p)) $$
+$$\Psi(t) = \Tanh(\frac{\Pi}{2} \Sinh(t^p)) $$
 These are called TSHi where i is 1,3,5... 
 for more details look into this [paper](https://ems.press/content/serial-article-files/2719)
 ``` julia
