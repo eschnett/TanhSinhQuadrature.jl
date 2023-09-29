@@ -2,7 +2,7 @@ module TanhSinhQuadrature
 
 using LinearAlgebra: norm
 using StaticArrays
-
+using SimpleNonlinearSolve
 ################################################################################
 
 export TSQuadrature, quadts
@@ -33,22 +33,29 @@ struct TSQuadrature{T}
     levels::Vector{Level{T}}
 end
 
-@inline ordinate(t::T) where {T<:Real} = tanh(T(π) / 2 * sinh(t))
-@inline weight(t::T) where {T<:Real} = T(π) / 2 * cosh(t) / cosh(T(π) / 2 * sinh(t))^2
+@inline ordinate(t::T, p::Int=1) where {T<:Real} = tanh(T(π) / 2 * sinh(t^p))
+@inline weight(t::T, p::Int=1) where {T<:Real} = (p / 2) * T(π) * t^(p - 1) * cosh(t^p) / cosh(T(π) / 2 * sinh(t^p))^2
+
+@inline inv_ordinate(t::T, p::Int=1) where {T<:Real} = (asinh(log((one(T) + t) / (one(T) - t)) / T(π)))^(one(T) / T(p))
 
 # Find the step size `h` at which a single step suffices to exhaust
-# the numerical precision
-function find_h(T::Type)
-    i = 1
-    while true
-        t = T(i)
-        x = ordinate(t)
-        w = weight(t)
-        abs(x) == 1 && break
-        w == 0 && break
-        i += 1
-    end
-    return T(max(1, i - 1))
+# the numerical precision. Look at https://arxiv.org/pdf/2007.15057.pdf
+function find_tmax(T::Type, p::Int)
+    Fmin = eps(T)
+    tmaxx = inv_ordinate(one(T) - Fmin, p)
+
+    # y(x, l) = ordinate(x, p) - 1 + Fmin
+    # u0 = tmaxx
+    # probN = NonlinearProblem(y, u0)
+    # tmaxx = solve(probN, SimpleNewtonRaphson(); abstol=1e-20)[1]
+
+    f(x, l) = weight(x, p) - Fmin
+    u0 = tmaxx
+    probN = NonlinearProblem(f, u0)
+    tmaxw = solve(probN, SimpleNewtonRaphson(); abstol=eps(T))[1]
+    @show tmaxw
+    @show tmaxx
+    return min(tmaxx, tmaxw)
 end
 
 function Level(h::T) where {T<:Real}
@@ -67,8 +74,10 @@ function Level(h::T) where {T<:Real}
     return Level{T}(points)
 end
 
-function TSQuadrature{T}(nlevels::Int=20) where {T<:Real}
-    h = find_h(T)
+function TSQuadrature{T}(p::Int=1, nlevels::Int=20) where {T<:Real}
+    @assert isodd(p)
+    h = find_tmax(T, p)
+    @show h
     levels = Level{T}[]
     # println("TSQuadrature{$T}:")
     for level in 1:nlevels
@@ -106,7 +115,7 @@ function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
 
         tol = max(norm(s) * rtol, atol)
         error = norm(s - sold)
-        levels ≥ 4 && error ≤ tol && break
+        levels ≥ 1 && error ≤ tol && break
     end
 
     return (result=s, error=error, levels=levels)
