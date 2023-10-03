@@ -53,9 +53,9 @@ function find_tmax(T::Type, p::Int)
     u0 = tmaxx
     probN = NonlinearProblem(f, u0)
     tmaxw = solve(probN, SimpleNewtonRaphson(); abstol=eps(T))[1]
-    @show tmaxw
-    @show tmaxx
-    return min(tmaxx, tmaxw)
+
+    tmax = max(tmaxx, tmaxw)
+    return tmax
 end
 
 function Level(h::T) where {T<:Real}
@@ -77,7 +77,7 @@ end
 function TSQuadrature{T}(p::Int=1, nlevels::Int=20) where {T<:Real}
     @assert isodd(p)
     h = find_tmax(T, p)
-    @show h
+    # @show h
     levels = Level{T}[]
     # println("TSQuadrature{$T}:")
     for level in 1:nlevels
@@ -103,7 +103,6 @@ function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
         h /= 2
         levels += 1
         sold = s
-
         s = zero(sold)
         for p in level.points
             xm = xmin + Δx * (1 - p.x)
@@ -115,7 +114,7 @@ function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
 
         tol = max(norm(s) * rtol, atol)
         error = norm(s - sold)
-        levels ≥ 1 && error ≤ tol && break
+        levels ≥ 4 && error ≤ tol && break
     end
 
     return (result=s, error=error, levels=levels)
@@ -217,6 +216,11 @@ function quadts(f, quad::TSQuadratureND{D,T}, xmin::SVector{D,T}, xmax::SVector{
     end
 
     return (result=s, error=error, levels=levels)
+end
+
+function quadts(f, quad::TSQuadratureND{D,T}, xmin::AbstractVector{<:Real}, xmax::AbstractVector{<:Real};
+                atol::Real=zero(T), rtol::Real=atol > 0 ? zero(T) : sqrt(eps(T))) where {D,T<:Real}
+    return quadts(f, quad, SVector{D,T}(xmin), SVector{D,T}(xmax); atol=atol, rtol=rtol)
 end
 
 function quadts(f, quad::TSQuadratureND{D,T}, xmin::Union{NTuple{D},SVector{D}}, xmax::Union{NTuple{D},SVector{D}};
