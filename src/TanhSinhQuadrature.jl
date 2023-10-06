@@ -40,64 +40,48 @@ end
 
 # Find the step size `h` at which a single step suffices to exhaust
 # the numerical precision. Look at https://arxiv.org/pdf/2007.15057.pdf
-function find_tmax(T::Type, p::Int)
-    Fmin = eps(T)
-    tmaxx = inv_ordinate(one(T) - Fmin, p)
+find_tmax(T::Type, p::Int) = find_tmaxND(1, T, p)
 
-    # y(x, l) = ordinate(x, p) - 1 + Fmin
-    # u0 = tmaxx
-    # probN = NonlinearProblem(y, u0)
-    # tmaxx = solve(probN, SimpleNewtonRaphson(); abstol=1e-20)[1]
-
-    f(x, l) = weight(x, p) - Fmin
-    u0 = tmaxx
-    probN = NonlinearProblem(f, u0)
-    tmaxw = solve(probN, SimpleNewtonRaphson(); abstol=eps(T))[1]
-
-    tmax = max(tmaxx, tmaxw)
-    return tmax
-end
-
-function Level(h::T) where {T<:Real}
+# w == 0
+# abs(x) == 1
+# is that good?
+function Level(h::T, n) where {T<:Real}
     points = Point{T}[]
-    i = 1
-    while true
-        t = i * h
+    for i in 0:(2^(n - 1) - 1)
+        t = h + i * (2h)
         x = ordinate(t)
         w = weight(t)
-        i > 0 && abs(x) == 1 && break
-        i > 0 && w == 0 && break
+        # i > 0 && abs(x) == 1 && break
+        # i > 0 && w == 0 && break
         push!(points, Point{T}(x, w))
-        i += 2
     end
     reverse!(points)            # improve summation accuracy
     return Level{T}(points)
 end
 
-function TSQuadrature{T}(p::Int=1, nlevels::Int=20) where {T<:Real}
+function TSQuadrature{T}(nlevels::Int=20, p::Int=1) where {T<:Real}
     @assert isodd(p)
     h = find_tmax(T, p)
-    # @show h
     levels = Level{T}[]
-    # println("TSQuadrature{$T}:")
     for level in 1:nlevels
-        push!(levels, Level(h / 2^level))
-        npoints = length(levels[end].points)
-        # println("    level: $level    npoints: $npoints")
+        push!(levels, Level(h / 2^level, level))
     end
     return TSQuadrature{T}(h, levels)
 end
 
+# maps [a,b] to [-1,1]
+transform(u::T, a::T, b::T) where {T} = (b + a) / T(2) + ((b - a) / T(2)) * u
+
 function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
                 rtol::T=atol > 0 ? zero(T) : sqrt(eps(T))) where {T<:Real}
     Δx = (xmax - xmin) / 2
-    h = quad.h * Δx
+    h = quad.h
 
     x = (xmin + xmax) / 2
     w = weight(zero(T))
-    s = h * w * f(x)
+    s = h * w * f(transform(zero(T), xmin, xmax))
     levels = 0
-    error = norm(typeof(s)(Inf))
+    error = T(Inf) # norm(typeof(s)(Inf))
 
     for level in quad.levels
         h /= 2
@@ -105,8 +89,8 @@ function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
         sold = s
         s = zero(sold)
         for p in level.points
-            xm = xmin + Δx * (1 - p.x)
-            xp = xmax - Δx * (1 - p.x)
+            xm = transform(-p.x, xmin, xmax)
+            xp = transform(p.x, xmin, xmax)
             w = p.w
             s += w * (f(xm) + f(xp))
         end
@@ -114,10 +98,10 @@ function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
 
         tol = max(norm(s) * rtol, atol)
         error = norm(s - sold)
-        levels ≥ 4 && error ≤ tol && break
+        levels ≥ 1 && error ≤ tol && break
     end
 
-    return (result=s, error=error, levels=levels)
+    return (result=Δx * s, error=error, levels=levels)
 end
 
 function quadts(f, quad::TSQuadrature{T}, xmin::Real, xmax::Real; atol::Real=zero(T),
@@ -147,6 +131,7 @@ struct TSQuadratureND{D,T}
     levels::Vector{LevelND{D,T}}
 end
 
+# is w ≠ 0 ok?
 function LevelND{D,T}(level::Level{T}) where {D,T<:Real}
     D::Int
     @assert D ≥ 0
@@ -155,27 +140,51 @@ function LevelND{D,T}(level::Level{T}) where {D,T<:Real}
     for i in CartesianIndex(ntuple(d -> 1, D)):CartesianIndex(ntuple(d -> npoints, D))
         x = SVector{D,T}(level.points[Tuple(i)[d]].x for d in 1:D)
         w = prod(level.points[Tuple(i)[d]].w for d in 1:D)
-        w ≠ 0 && push!(points, PointND{D,T}(x, w))
+        # w ≠ 0 && push!(points, PointND{D,T}(x, w))
+        push!(points, PointND{D,T}(x, w))
     end
     return LevelND{D,T}(points)
 end
 
-function TSQuadratureND{D,T}(quad::TSQuadrature{T}) where {D,T<:Real}
-    D::Int
+function find_tmaxND(D::Int, T::Type, p::Int)
+    Fmin = eps(T)
+    tmaxx = inv_ordinate(one(T) - Fmin, p)
+
+    f(x, l) = weight(x, p)^D - Fmin
+    u0 = (tmaxx)^(1 / D)
+    probN = NonlinearProblem(f, u0)
+    tmaxw = solve(probN, SimpleNewtonRaphson(); abstol=eps(T))[1]
+    tmax = min(tmaxx, tmaxw) # min or max?
+    return tmax
+end
+
+#if I add type in constructor, julia doesn't see the whole function, why?
+function TSQuadratureND{D,T}(nlevels::Int, p::Int=1) where {D,T<:Real}
+    D::Int #why ?
     @assert D ≥ 0
-    h = quad.h
-    nlevels = length(quad.levels)
+
+    h = find_tmaxND(D, T, p)
+    levels = Level{T}[]
+    for level in 1:nlevels
+        push!(levels, Level(h / 2^level, level))
+    end
+    quad = TSQuadrature{T}(h, levels)
     levels = LevelND{D,T}[]
-    # println("TSQuadratureND{$D,$T}:")
     for level in 1:nlevels
         push!(levels, LevelND{D,T}(quad.levels[level]))
         npoints = length(levels[end].points)
-        # println("    level: $level    npoints: $npoints")
     end
     return TSQuadratureND{D,T}(h, levels)
 end
 
-TSQuadratureND{D,T}(nlevels::Int) where {D,T<:Real} = TSQuadratureND{D,T}(TSQuadrature{T}(nlevels))
+# TSQuadratureND{D,T}(nlevels::Int) where {D,T<:Real} = TSQuadratureND{D,T}(TSQuadrature{T}(nlevels))
+import Base.eltype
+eltype(p::PointND{D,T}) where {D,T} = T
+eltype(q::TSQuadratureND{D,T}) where {D,T} = T
+eltype(l::LevelND{D,T}) where {D,T} = T
+
+# maps [a,b] to [-1,1] in 3D
+transform(u::AbstractVector{T}, a::AbstractVector{T}, b::AbstractVector{T}) where {T} = @. (b + a) / T(2) + ((b - a) / T(2)) * u
 
 function quadts(f, quad::TSQuadratureND{D,T}, xmin::SVector{D,T}, xmax::SVector{D,T}; atol::T=zero(T),
                 rtol::T=atol > 0 ? zero(T) : sqrt(eps(T))) where {D,T<:Real}
@@ -183,39 +192,53 @@ function quadts(f, quad::TSQuadratureND{D,T}, xmin::SVector{D,T}, xmax::SVector{
     @assert D ≥ 0
 
     Δx = (xmax - xmin) / 2
-    h = quad.h^D * prod(Δx)
-
+    h = quad.h # * Δx
     x = (xmin + xmax) / 2
     w = weight(zero(T))^D
-    s = h * w * f(x...)
-    levels = 0
-    error = norm(typeof(s)(Inf))
+    s = prod(h) * w * f(x...)
 
+    levels = 0
+    error = T(Inf) #norm(typeof(s)(Inf))
     for level in quad.levels
-        h /= 2^D
+        h /= 2
         levels += 1
         sold = s
 
         s = zero(sold)
         for p in level.points
-            t = zero(s)
+            t = zero(sold)
             for i in CartesianIndex(ntuple(d -> -1, D)):CartesianIndex(ntuple(d -> 2, D)):CartesianIndex(ntuple(d -> +1, D))
-                xm = xmin + Δx .* (1 .- p.x)
-                xp = xmax - Δx .* (1 .- p.x)
+                xm = transform(-p.x, xmin, xmax)
+                xp = transform(p.x, xmin, xmax)
                 x = SVector{D,T}(Tuple(i)[d] < 0 ? xm[d] : xp[d] for d in 1:D)
                 t += f(x...)
             end
-            w = p.w
-            s += w * t
+            # p.w = w1*w2*w3...
+            s += p.w * t
         end
-        s = h * s + sold / 2
+        # shouldn't sold/2^D?
+        s = h^D * s + sold / 2
 
         tol = max(norm(s) * rtol, atol)
         error = norm(s - sold)
-        levels ≥ 4 && error ≤ tol && break
+        levels ≥ 1 && error ≤ tol && break
     end
 
-    return (result=s, error=error, levels=levels)
+    return (result=prod(Δx) * s, error=error, levels=levels)
+end
+
+export myquad2, myquad3
+function myquad3(f, quad, xmin, xmax)
+    f1(x, y) = quadts(z -> f(x, y, z), quad, xmin[3], xmax[3]).result
+    f2(x) = quadts(y -> f1(x, y), quad, xmin[2], xmax[2]).result
+    f3() = quadts(x -> f2(x), quad, xmin[1], xmax[1]).result
+    return f3()
+end
+
+function myquad2(f, quad, xmin, xmax)
+    f2(x) = quadts(y -> f(x, y), quad, xmin[2], xmax[2]).result
+    f3() = quadts(x -> f2(x), quad, xmin[1], xmax[1]).result
+    return f3()
 end
 
 function quadts(f, quad::TSQuadratureND{D,T}, xmin::AbstractVector{<:Real}, xmax::AbstractVector{<:Real};
