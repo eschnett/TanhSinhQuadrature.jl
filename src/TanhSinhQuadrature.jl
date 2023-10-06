@@ -229,15 +229,15 @@ end
 
 export myquad2, myquad3
 function myquad3(f, quad, xmin, xmax)
-    f1(x, y) = quadts(z -> f(x, y, z), quad, xmin[3], xmax[3]).result
-    f2(x) = quadts(y -> f1(x, y), quad, xmin[2], xmax[2]).result
-    f3() = quadts(x -> f2(x), quad, xmin[1], xmax[1]).result
+    f1(x, y) = quadts(z -> f(x, y, z), quad, xmin[3], xmax[3])[1]
+    f2(x) = quadts(y -> f1(x, y), quad, xmin[2], xmax[2])[1]
+    f3() = quadts(x -> f2(x), quad, xmin[1], xmax[1])[1]
     return f3()
 end
 
 function myquad2(f, quad, xmin, xmax)
-    f2(x) = quadts(y -> f(x, y), quad, xmin[2], xmax[2]).result
-    f3() = quadts(x -> f2(x), quad, xmin[1], xmax[1]).result
+    f2(x) = quadts(y -> f(x, y), quad, xmin[2], xmax[2])[1]
+    f3() = quadts(x -> f2(x), quad, xmin[1], xmax[1])[1]
     return f3()
 end
 
