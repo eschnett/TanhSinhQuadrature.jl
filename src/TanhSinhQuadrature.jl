@@ -74,6 +74,9 @@ transform(u::T, a::T, b::T) where {T} = (b + a) / T(2) + ((b - a) / T(2)) * u
 
 function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
                 rtol::T=atol > 0 ? zero(T) : sqrt(eps(T))) where {T<:Real}
+    if xmin == xmax
+        return 0
+    end
     Δx = (xmax - xmin) / 2
     h = quad.h
 
