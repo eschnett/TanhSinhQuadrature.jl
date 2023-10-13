@@ -42,6 +42,17 @@ julia> quadts(f, TSQuadrature{Float64}(3), -1,1, atol=1e-16)
 (result = 3.9999991492059976, error = 8.290316966252931e-7, levels = 20)
 ```
 
+
+## issues
+
+when the function has a singularity at one of the interval points,
+and the interval is small, Underflow happens. As the levels of refinement
+increase, the integration points coincide on t=+-1 and thus evaluate the
+function at the singularity. This should not happen since we explicitly 
+impose conditions to avoid UFL to get the integration domain.
+
+
+
 ## Related work
 
 One-dimensional tanh-sinh quadrature:

@@ -95,6 +95,7 @@ function quadts(f, quad::TSQuadrature{T}, xmin::T, xmax::T; atol::T=zero(T),
             xm = transform(-p.x, xmin, xmax)
             xp = transform(p.x, xmin, xmax)
             w = p.w
+            # @show xm, xp, f(xm), f(xp), p.x
             s += w * (f(xm) + f(xp))
         end
         s = h * s + sold / 2
@@ -157,7 +158,8 @@ function find_tmaxND(D::Int, T::Type, p::Int)
     u0 = (tmaxx)^(1 / D)
     probN = NonlinearProblem(f, u0)
     tmaxw = solve(probN, SimpleNewtonRaphson(); abstol=eps(T))[1]
-    tmax = min(tmaxx, tmaxw) # min or max?
+    tmax = min(tmaxx, tmaxw)
+    @show tmaxx, tmaxw
     return tmax
 end
 
@@ -231,7 +233,7 @@ function quadts(f, quad::TSQuadratureND{D,T}, xmin::SVector{D,T}, xmax::SVector{
 end
 
 export myquad2, myquad3
-function myquad3(f, quad, xmin, xmax)
+function myquad3(f, quad::TSQuadrature{T}, xmin::AbstractVector{T}, xmax::AbstractVector{T}) where {T<:Real}
     f1(x, y) = quadts(z -> f(x, y, z), quad, xmin[3], xmax[3])[1]
     f2(x) = quadts(y -> f1(x, y), quad, xmin[2], xmax[2])[1]
     f3() = quadts(x -> f2(x), quad, xmin[1], xmax[1])[1]
