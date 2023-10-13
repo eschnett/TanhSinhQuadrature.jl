@@ -159,7 +159,6 @@ function find_tmaxND(D::Int, T::Type, p::Int)
     probN = NonlinearProblem(f, u0)
     tmaxw = solve(probN, SimpleNewtonRaphson(); abstol=eps(T))[1]
     tmax = min(tmaxx, tmaxw)
-    @show tmaxx, tmaxw
     return tmax
 end
 
