@@ -55,6 +55,20 @@ function find_tmaxND(::Type{T}, D::Int, p::Int) where {T}
     return tmax
 end
 
+function find_tmax_transformed_domain(::Type{T}, xmin::T, xmax::T, p::Int) where {T}
+    s = (xmax + xmin) / 2
+    u = (xmax - xmin) / 2
+    Fmin = eps(T)
+    tmaxx = inv_ordinate((one(T) - Fmin - s) / u, p)
+    f(x, l) = weight(x, p) - Fmin
+    u0 = (tmaxx)
+    probN = NonlinearProblem(f, u0)
+    # is this maybe responsible for the Inf results for small domains ? Maybe increase the tolerance?
+    tmaxw = solve(probN, SimpleNewtonRaphson(); abstol=eps(T))[1]
+    tmax = min(tmaxx, tmaxw)
+    return tmax
+end
+
 function Level(h::T, n) where {T<:Real}
     points = Point{T}[]
     for i in 0:(2^(n - 1) - 1)
@@ -146,9 +160,9 @@ function quadts(f, quad::TSQuadrature{T}, xmin::Real, xmax::Real; atol::T=zero(T
         return _quadts(f, quad; atol=atol, rtol=rtol)
     else
         s = (xmax + xmin) / 2
-        t = (xmax - xmin) / 2
-        res, err, lvls = _quadts(u -> f(s + t * u), quad; atol=atol / t, rtol=rtol)
-        return (res * t, err * t, lvls)
+        u = (xmax - xmin) / 2
+        res, err, lvls = _quadts(x -> f(s + u * x), quad; atol=atol / u, rtol=rtol)
+        return (res * u, err * u, lvls)
     end
 end
 
